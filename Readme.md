@@ -28,19 +28,27 @@ net.ipv4.ip_forward = 1
 
 # Apply changes
 sudo sysctl -p
+```
 
+## 📦 Step 2: Install Container Runtime (containerd)
+
+```bash
 sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl gpg
 sudo apt install -y containerd
 
+## Configure cgroup driver (if using systemd)
 ps -p 1  # check if systemd is the init system
 
 sudo mkdir -p /etc/containerd
 containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' \
   | sudo tee /etc/containerd/config.toml
 sudo systemctl restart containerd
+```
 
+## 🌉 Step 3: Kernel Modules (All Nodes)
 
+```bash
 # Load br_netfilter
 sudo modprobe br_netfilter
 
@@ -53,8 +61,11 @@ echo "net.bridge.bridge-nf-call-ip6tables = 1" | sudo tee -a /etc/sysctl.conf
 
 # Apply settings
 sudo sysctl -p
+```
 
+## 📥 Step 4: Install Kubernetes Components (All Nodes)
 
+```bash
 # Add Kubernetes repo key
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key \
   | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
@@ -73,23 +84,41 @@ sudo apt-mark hold kubelet kubeadm kubectl
 
 # Enable kubelet
 sudo systemctl enable --now kubelet
+```
 
+## 🖥️ Step 5: Initialize Control Plane (Only Master Node)
 
-
+```bash
 sudo kubeadm init \
   --apiserver-advertise-address=192.168.0.4 \
   --pod-network-cidr=10.244.0.0/16 \
   --upload-certs
 
+# After initialization, configure kubectl for your non-root user:
 
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
 
-
+## 🌐 Step 6: Install Pod Network (Flannel)
+```bash
 kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+```
 
-
+## 🛠️ Step 7: Join Worker Nodes
+```bash
 kubeadm join 192.168.0.4:6443 --token <your-token> \
   --discovery-token-ca-cert-hash sha256:<your-hash>
+```
 
+# 👉 If you lose the token, generate a new one on the control plane:
+```bash
+kubeadm token create --print-join-command
+```
+
+## ✅ Step 8: Verify Cluster
+```
+kubectl get nodes
+kubectl get pods -A
+```
